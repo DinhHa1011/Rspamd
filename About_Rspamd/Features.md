@@ -13,4 +13,4 @@
   - `Chartable` module giúp tìm các message được tạo đặc biệt nhằm mục đích đánh lừa hệ thống spam filter bằng cách chuyển ngôn ngữ của text và replacing letter với chất lượng của chúng. Rspamd sử dụng chuẩn UTF-8 để phát hiện và lọc những kỹ thuật thường được spammer sử dụng
 ### Policy check features
 - Có nhiều nguồn xác định policy cho object khác nhau trong email transfer: cho địa chỉ IP của người gửi, cho URLs trong một message và thậm chí cho một message itself . Ví dụ, một message có thể đăng ký bởi sender sừ dụng DKIM technology. Ví dụ khác có thể là URL filtering: phishing check hoặc URL DNS blacklists - SURBL. Rspamd support kiểm tra policy khác nhau:
-  - SPF checks cho phép xác thực một người gửi của message sử dụng chính sách defined trong DNS record của domain của người gửi. Bạn có thể đọc về chính sách SPF [ở đây]https://datatracker.ietf.org/doc/html/rfc7208
+  - SPF checks cho phép xác thực một người gửi của message sử dụng chính sách defined trong DNS record của domain của người gửi. Bạn có thể đọc về chính sách SPF [[ở đây](https://datatracker.ietf.org/doc/html/rfc7208)
