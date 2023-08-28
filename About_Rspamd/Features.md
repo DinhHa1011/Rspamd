@@ -17,4 +17,16 @@
   - DKIM
   - DMARC chứa DKIM và SPF 
   - ARC là một bổ sung tương đối mới cho chữ ký DKIM cơ chế cho phép chuyển tiếp các message qua một chuỗi các rule đáng tin cậy
-  - Whi
+  - Whitelists được sử dụng để tránh các lượt truy cập positive giả dành cho các domain đáng tin cậy để pass các checks như DKIM, SPF, DMARC. Ví dụ, chúng ta không nên lọc message từ PayPal nế chúng được ký chính xác bằng chữ ký tên miền Paypal. Mặt khác, nếu chúng không được ký và chính sách DMARC định nghĩa quy tắc hạn chế cho DKIM, chúng ta nên đánh dấu message là spam vì nó có khả năng phishing. Whitelist module cung cấp các mode khác để thực hiện match chính sách và whitelist hoặc blacklist của certain combinations của verification results
+  - DNS lists cho phép ước tính danh tính của địa chỉ IP của người gửi hoặc network. Rspamd sử dụng một số của DNS list bao gồm list như SORBS hoặc SpamHaus. Tuy nhiên, Rspamd cuối cùng không tin tưởng bất kỳ danh sách DNS cụ thể nào và không từ chối message dựa trên yếu tố này
+  - Phising checks cực kỳ hữu ích để lọc các message luwafddaro và bảo vệ người dùng khỏi các cuộc tấn công mạng. Rspamd sử dụng các thuật toán phức tạp để tìm các URL lừa đảo và hỗ trợ các trình chuyển hướng URL phổ biến để tránh các lượt truy cập giả. Cơ sở dữ liệu lừa đảo phổ biến, chẳng hạn như Openphishvaf phishtank cũng được hỗ trợ
+  - Rate limits cho phép ngăn chặn việc gửi mail hàng loạt từ những user bị hack của bạn. Đây là một tính năng cực kỳ hữu ích để bảo vệ cả luồng mail gửi đến và gửi đi
+  - Ip reputation plugin cho phép điều chỉnh danh tiếng cho các địa chỉ IP, network, autonomous block (ASN) và thậm chí cả quốc gia
+  - Greylisting là một phương pháp phổ biến nhằm tạo ra độ trễ vì những message đáng ngờ, như nhiều người spam không sử dụng máy chủ SMTP đầy đủ chức năng cho phép queue các message bị trì hoãn. Rspamd triển khai greylisting nội bộ và có thể trì hoãn các mail có điểm cao hơn ngưỡng nhất định
+  - Reply module nhằm mục đích đưa các message trả lời message vào danh sách trắng vì những message này có thể quan trọng với người dùng và những thông báo sai là điều không mong muốn với họ
+  - Maps module cung cấp một Swiss Knife như tool để có thể lọc messgae dựa trên các thuộc tính khác nhau: header, envelope data, IP của người gửi,... Module này rất hữu ích cho việc xây dựng các quy tắc tùy chỉnh
+### Statistical tools
+- Statistical approach (phương pháp thống kê) bao gồm nhiều kỹ thuật nhận dạng spam hữu ích có thể học hỏi linh hoạt từ các message được quét. Rspamd cung cấp các công cụ khác nhau có thể học theo các thủ công hoặc tự động và áp dụng cho mail flow thực tế
+  - Bayes classifier là một tool để phân loại message spam và ham. Rspamd sử dụng một advanced algorithm để tạo statistical tokens có thể đạt được kết quả tốt hơn phương pháp Bayes được sử dụng nhiều nhất
+  - Nerual network học hỏi từ scan results và allows để cải thiện final score bằng tìm một vài 
+mẫu quy tắc chung điển hình cho message spam hoặc ham. Module này đặc biệt hữu ích cho hệ thống email lớn như nó có thể học từ rule riêng của bạn và nhanh chóng áp dụng spam mail hàng loạt
