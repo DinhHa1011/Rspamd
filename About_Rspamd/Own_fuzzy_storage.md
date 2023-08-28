@@ -39,4 +39,39 @@
   - Transport protocol encryption
   - Replication
 - Config cho `worker "fuzzy"` bắt đầu trong phần `/etc/rspamd/rspamd.conf`
-- Một lệnh `.include` ở đó liên kết đến `/etc/rspamd/local.d/worker-fuzzy.inc`, đây là nơi cài đặt local kích hoạt và định cấu hình quá trình này (tài liệu trc đó đề cập đến `/etc/rspamd/rspamd.conf.local`
+- Một lệnh `.include` ở đó liên kết đến `/etc/rspamd/local.d/worker-fuzzy.inc`, đây là nơi cài đặt local kích hoạt và định cấu hình quá trình này (tài liệu trc đó đề cập đến `/etc/rspamd/rspamd.conf.local`)
+### Sample configuration
+- Sau đây là cấu hình mẫu cho quy trình nhân viên lưu trữ mờ này, sẽ được giải thích và đề cập bên dưới. vui lòng tham khảo trang này để biết bất kỳ cài đặt nào không được mô tả ở đây.
+```
+worker "fuzzy" {
+  # Socket to listen on (UDP and TCP from rspamd 1.3)
+  bind_socket = "*:11335";
+
+  # Number of processes to serve this storage (useful for read scaling)
+  count = 4;
+
+  # Backend ("sqlite" or "redis" - default "sqlite")
+  backend = "sqlite";
+
+  # sqlite: Where data file is stored (must be owned by rspamd user)
+  database = "${DBDIR}/fuzzy.db";
+
+  # Hashes storage time (3 months)
+  expire = 90d;
+
+  # Synchronize updates to the storage each minute
+  sync = 1min;
+}
+```
+- Ví dụ này shows một entire section, không phải như bạn sẽ thấy trong file, mà như nó nhìn vào controller khi chi tiết cài đặt được thu thập từ tất cả file (Với tệp .include): hãy đảm bảo đặt các thay đổi trong tệp .inc, không như `worker` wrapper
+- Mặc định, tiến trình `fuzzy_storage` không active, với `count=-1` chỉ thị được tìm thấy trong core file. Để active fuzzy storage, local .inc file nhận lệnh `count = 4` như đã thấy ở trên.
+- Các giá trị `expire` và `sync` có liên quan đến việc dọn dẹp và hiệu suất cơ sở dữ liệu, như được mô tả bên dưới
+- Fuzzy storage làm việc với hashes và không phải với email message. Một worker/scanner process hoặc một controller process chuyển đổi email thành hash trước khi kết nối tới process này cho fuzzy processing. Trong mẫu này, chúng ta sẽ thấy quy trình fuzzy storage hoạt động trên database SQLite được nghe trên socket 11335 cho UDP requests từ processes khác để query hoặc update storage
+![image](https://github.com/DinhHa1011/Rspamd/assets/119484840/ff2c53af-1680-4f60-9bea-a9dcfbf7339f)
+### Data storage
+- Công cụ database, SQLite3, có một số hạn chế về kiến trúc lưu trữ có thể ảnh hưởng đến hiệu suất. Cụ thể, SQLite không thể xử lý tốt các write đồng thời, nơi mà có thể dẫn đến suy giảm đáng kể hiệu suất database
+- Để giải quyết vấn đề này, Rspamd hash storage luôn write vào database từ một quy trình duy nhất, fuzzy storage worker. Quá trình này duy trì một update queue, trong khi tất cả process khác chỉ đơn giản là chuyển tiếp yêu cầu write từ client tới quy trình này. Theo mặc định, update queue được viết vào disk mỗi phút một lần, nhưng điều này có thể được cấu hình bằng cách sử dụng cài đặt đồng bộ hóa trong sample config
+- Kiến trúc này được tối ưu hóa cho các yêu cầu đọc và ưu tiên chúng
+### Hash expiration
+- Một chức năng quan trọng khác của fuzzy storage worker là xóa hash lỗi thời bằng cách sử dụng `expire` setting
+- Mô hình spam thay đổi khi các chiến thuật nhất định trở nên hiệu quả ít nhiều. Spammers gửi hàng loạt mail spam, sau một khoảng thời gian từ vài ngày đến vài tháng, họ thay đổi mô hình vì họ biết những hệ thống như thế này đang phân tích dữ liệu của họ. Vì " thời gian tồn tại hiệu quả" của spam email thì luôn giới hạn, không có lý do gì để lưu trữ tất cả hash permanently. Dựa trên kinh nghiệm, nó recommended để lưu trữ hash không quá 3 tháng.
