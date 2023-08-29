@@ -75,3 +75,83 @@ worker "fuzzy" {
 ### Hash expiration
 - Một chức năng quan trọng khác của fuzzy storage worker là xóa hash lỗi thời bằng cách sử dụng `expire` setting
 - Mô hình spam thay đổi khi các chiến thuật nhất định trở nên hiệu quả ít nhiều. Spammers gửi hàng loạt mail spam, sau một khoảng thời gian từ vài ngày đến vài tháng, họ thay đổi mô hình vì họ biết những hệ thống như thế này đang phân tích dữ liệu của họ. Vì " thời gian tồn tại hiệu quả" của spam email thì luôn giới hạn, không có lý do gì để lưu trữ tất cả hash permanently. Dựa trên kinh nghiệm, nó recommended để lưu trữ hash không quá 3 tháng.
+- bạn nên so sánh khối lượng hash đã học trong một khoảng thời gian nhất định với ram có sẵn. ví dụ: 400.000 giá trị băm có thể chiếm khoảng 100 mb và 1,5 triệu giá trị băm có thể chiếm khoảng 500 mb. để tránh tình trạng giảm hiệu suất đáng kể, không nên tăng kích thước bộ nhớ vượt quá kích thước ram khả dụng. nghĩa là không dựa vào không gian trao đổi hoặc phân bổ quá nhiều tài nguyên cho các quy trình khác. nếu bạn có một lượng nhỏ băm phù hợp cho việc học, hãy bắt đầu với thời gian hết hạn là 90 ngày. nếu khối lượng dữ liệu trong khoảng thời gian đó dẫn đến lượng ram khả dụng không thể chấp nhận được, chẳng hạn như ram khả dụng trong thời gian cao điểm giảm xuống 20%, bạn có thể muốn giảm thời gian hết hạn xuống 70 ngày và xem liệu dữ liệu từ các bản phát hành bộ lưu trữ có hết hạn hay không một lượng ram dễ chấp nhận hơn.
+### Access Control
+- Theo mặc định, Rspamd không cho phép thay đổi fuzzy storage. Bất kì hệ thống nào connect tới tiến trình fuzzy_storage thông qua UDP phải được ủy quyền, và phải cung cấp danh sách các địa chỉ IP và / hoặc mạng đáng tin cậy để hỗ trợ việc học. Trong thực tế, nó tốt hơn là viết từ địa chỉ local (127.0.0.1) vì fuzzy storage sử dụng UDP, không được bảo vệ khỏi việc giả mạo IP nguồn
+```
+worker "fuzzy" {
+  # Same options as before ...
+  allow_update = ["127.0.0.1"];
+
+  # or 10.0.0.0/8, for internal network
+}
+```
+- Cài đặt `allow_update` là một mảng gồm các huỗi phân tách bằng dấu `,`, hoặc một map của địa chỉ IP, được phép thực hiện các thay đổi đối với fuzzy storage - bạn cũng nên đặt read_only = no trong plugin matte_check của mình, xem bước 3 bên dưới
+### Transport protocol encryption
+- fuzzy hash protocol cho phép mã hóa tùy chọn ( opportunistic) hoặc mã hóa bắt buộc dựa trên pulic-key cryotigraphy. Tính năng này được sử dụng cho việc tạo kho lưu trữ hạn chế nơi quyền truy cập chỉ được phép dành cho khách hoàng hoặc đối tác kinh doanh khác có khóa chung được tạo
+- How this works:
+  - Config được sửa đổi trong `/etc/rspamd/local.d/worker-fuzzy.inc` của hệ thống cục bộ đang chạy fuzzy_storage worker. Một cặp khóa public/private được cài cho mỗi remote UDP client rằng sẽ connect trên port 11335
+  - Mỗi public key duy nhất được cấp cho mỗi hệ thống client duy nhất, để chỉ một hệ thống đó có thể sử dụng một khóa đó.
+- Kiến trúc mã hóa sử dụng cryptobox construction và nó tương tự thuật toán mã hóa đầu cuối được sử dụng trong giao thức DNSCurve
+- Để config transport encryption, tạo một keypair cho storage server, sử dụng dòng lệnh `rspamadm keypair -u`. Mỗi lần lệnh này run, output duy nhất được trả về, như shown trong ví dụ (thứ tự của các cặp name=value có thể thay đổi mỗi lần run):
+```
+keypair {
+    pubkey = "og3snn8s37znxz53mr5yyyzktt3d5uczxecsp3kkrs495p4iaxzy";
+    privkey = "o6wnij9r4wegqjnd46dyifwgf5gwuqguqxzntseectroq7b3gwty";
+    id = "f5yior1ag3csbzjiuuynff9tczknoj9s9b454kuonqknthrdbwbqj63h3g9dht97fhp4a5jgof1eiifshcsnnrbj73ak8hkq6sbrhed";
+    encoding = "base32";
+    algorithm = "curve25519";
+    type = "kex";
+}
+```
+- Public key nên được sao chép thủ công tới remote host, hoặc publish theo bất kỳ cách nào đảm bảo độ tin cậy. Như mọi khi, private key không nên được publish hoặc share
+- Mỗi storage có thể sử dụng số nào của key simultaneously, 1 cho mỗi remote client (hoặc 1 group của client)
+```
+worker "fuzzy" {
+  # Same options as before ...
+  keypair {
+    pubkey = ...
+    privkey = ...
+  }
+  keypair {
+    pubkey = ...
+    privkey = ...
+  }
+  keypair {
+    pubkey = ...
+    privkey = ...
+  }
+}
+```
+- Cơ chế này là tùy chọn, nhưng nó có thể thành bắt buộc nếu add option `encrypted_only`. Trong mode này, client systems không có public key hợp lệ sẽ không thể truy cập vào storage
+```
+worker "fuzzy" {
+  # Same options as before ...
+  encrypted_only = true;
+
+  keypair {
+    ...
+  }
+  ...
+}
+```
+### Hashes replication
+- Có một bản sao local của remote fuzzy storage có thể được sử dụng trong nhiều tình huống. Để tạo điều kiện thuận lợi cho việc này, Rspamd cung cấp support cho hash replication, được xử lý bởi fuzzy storage worker. Bạn có thể tìm thấy hướng dẫn thiết lập trong step 4 bên dưới
+## Step 3: Configuring `fuzzy_check` plugin
+- `fuzzy_check` plugin được sử dụng bởi scanner processes để query một storage, và bởi các quy trình điều khiển để learning fuzzy hashes
+- Plugin functions:
+  - Email processing and hash creation from email part and attachments
+  - Quering from and learning to storage
+  - Transport Encryption
+- Learning được thực hiện bởi dòng lệnh `rspamc fuzzy_add`:
+```
+rspamc -f 1 -w 10 fuzzy_add <message|directory|stdin>
+```
+  - `-w`: hash weight
+  - `-f`: flag number
+- Flags enable lưu trữ hash từ sources khác nhau. Ví dụ, một hash có thể bắt nguồn từ một spam trap, hash khác có thể là kết quả của user complaints (khiếu nại người dùng), và một hash thứ 3 có thể đến từ email trên một whitelist. Mỗi flag có thể được liên kết với symbol riêng và có weight khi check emails:
+![image](https://github.com/DinhHa1011/Rspamd/assets/119484840/f82f9e0d-a034-466c-8be0-c05a3a99b1b3)
+- symbol name có thể được sử dụng thay vì numeric flag during learning, ví dụ:
+```
+$ rspamc -S FUZZY_DENIED -w 10 fuzzy_add <message|directory|stdin>
+```
