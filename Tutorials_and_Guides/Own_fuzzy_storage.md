@@ -419,4 +419,17 @@ Key id: icy63itbhhni8
   - `v0.9` - unencrypted requests from rspamd 0.9+ (fully compatible)
   - `v1.1` - encrypted requests from rspamd 1.1+ (fully compatible)
 - Sau đó số liệu thống kê được hiển thị cho mỗi config key trong storage và để biết địa chỉ IP của client. Trong phần kết luận, chúng ta thấy số liệu thống kê tổng thể về IP-addresses
-- 
+- Để thay đổi output từ command này, bạn có thể sử dụng options dưới dây:
+  - `-n`: hiển thị raw numbers without reduction
+  - `--short`: không hiển thị thống kê chi tiết trên key và IP-address
+  - `--no-keys`: không show statistics trên keys
+  - `--no-íp`: không show statistic trên IP-addresses
+  - `--sort`: sort:
+    - `checked`: theo số lượng hash đáng tin cậy (default)
+    - `matched`: theo số lượng hash tìm thấy
+    - `error`: theo số lượng request failed
+    - `ip`: theo IP-address theo từ điển
+- Ví dụ:
+```
+rspamadm control fuzzystat -n
+```
