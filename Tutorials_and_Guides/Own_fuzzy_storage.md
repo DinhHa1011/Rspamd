@@ -155,3 +155,268 @@ rspamc -f 1 -w 10 fuzzy_add <message|directory|stdin>
 ```
 $ rspamc -S FUZZY_DENIED -w 10 fuzzy_add <message|directory|stdin>
 ```
+- Ký hiệu `FUZZY_DENIED` tương đương với flag=11, như định nghĩa trong `modules.d/fuzzy_check.conf`. Để match ký hiệu với flag tương ứng, bạn có thể sử dụng `rule`
+```
+local.d/fuzzy_check.conf
+```
+```
+rule "local" {
+    # Fuzzy storage server list
+    servers = "localhost:11335";
+    # Default symbol for unknown flags
+    symbol = "LOCAL_FUZZY_UNKNOWN";
+    # Additional mime types to store/check
+    mime_types = ["*"];
+    # Hash weight threshold for all maps
+    max_score = 20.0;
+    # Whether we can learn this storage
+    read_only = no;
+    # Ignore unknown flags
+    skip_unknown = yes;
+    # Hash generation algorithm
+    algorithm = "mumhash";
+    # Use direct hash for short texts
+    short_text_direct_hash = true;
+
+    # Map flags to symbols
+    fuzzy_map = {
+        LOCAL_FUZZY_DENIED {
+            # Local threshold
+            max_score = 20.0;
+            # Flag to match
+            flag = 11;
+        }
+        LOCAL_FUZZY_PROB {
+            max_score = 10.0;
+            flag = 12;
+        }
+        LOCAL_FUZZY_WHITE {
+            max_score = 2.0;
+            flag = 13;
+        }
+    }
+}
+```
+```
+local.d/fuzzy_group.conf
+```
+```
+max_score = 12.0;
+symbols = {
+    "LOCAL_FUZZY_UNKNOWN" {
+        weight = 5.0;
+        description = "Generic fuzzy hash match";
+    }
+    "LOCAL_FUZZY_DENIED" {
+        weight = 12.0;
+        description = "Denied fuzzy hash";
+    }
+    "LOCAL_FUZZY_PROB" {
+        weight = 5.0;
+        description = "Probable fuzzy hash";
+    }
+    "LOCAL_FUZZY_WHITE" {
+        weight = -2.1;
+        description = "Whitelisted fuzzy hash";
+    }
+}
+```
+- Đây là một số tùy chọn hữu ích có thể được đặt trong module:
+- One option là `max_score`, trong đó chỉ định ngưỡng cho hash weight
+![image](https://github.com/DinhHa1011/Rspamd/assets/119484840/69b5e415-420e-48a6-ac08-7134a13d716e)
+- Option `mime_types` chỉ định loại attachment nào được kiểm tra (hoặc learned) sử dụng fuzzy rule. Option này lấy danh sách các loại valid theo format dưới đây: ["type/sybtype", "*/subtype", "type/*", "*"], trong đó `*` đại diện cho bất kì loại hợp lệ nào. Trong thực tế, việc lưu các giá trị hash cho tất cả `fuzzy_check` plugin, vì vậy không cần add `image/*` trong list của scanned attachment. Chú ý rằng attachments và images thì được search cho một exact match, trong khi text thì được match sử dụng thuật bán gần đúng (shingles)
+  - `read_only`: là một option khá quan trọng cần thiết cho việc storage learning. Nó set `read_only = true` là mặc định, do đó hạn chê khả năng storage's learning:
+```
+read_only = true; # disallow learning
+read_only = false; # allow learning
+```
+- Tham số `encryption_key` chỉ định public key của storage và enable encryption cho tất cả request
+- Tham số `algorithm` chỉ định thuật toán để tạo hash từ text part của email
+- Ban đầu, rspamd chỉ support thuật toán `siphash`. Tuy nhiên, thuật toán này có một vài vấn đề hiệu năng, đặc biệt là trên hardware cũ hơn (CPU models up to Intel Haswell). Sau đó, support đã được thêm vào cho các thuật toán sau:
+  - mumhash
+  - xxhash
+  - fasthash
+- Đối với phần lớn các config chúng tôi khuyên dùng mumhash hoặc fasthash (còn gọi nhanh là fast). Cấc thuật toán n ay hoạt động tốt trên nhiều nền tảng và mumhash hiện là mặc định cho tất cả cá bộ storage mới. `siphash` (còn gọi là `old` chỉ được support cho các mục đích cũ.
+- Bạn có thể đánh giá hiệu suất của các thuật toán khác nhau bằng [compiling the tests set
+](https://rspamd.com/doc/tutorials/writing_tests.html) từ rspamd sources:
+```
+make rspamd-test
+```
+- Run test suite các biến thế khác nhau của thuật toán hash trên specific platform:
+```
+test/rspamd-test -p /rspamd/shingles
+```
+- Important note: Việc thay đổi tham số này sẽ dẫn đến mất tất cả dữ liệu trong fuzzy hash storage, vì mỗi lần lưu trữ chỉ có thể dùng một thuật toán cho mỗi bộ storage. Không thể chuyển đổi loại hash này sang loại hash khác vì hash được thiết kế để không thể đảo ngược.
+### Condition scripts for the learning
+- `fuzzy_check` plugin chịu trách nhiệm cho learning, chúng ta tạo một script với comfig của nó. Script này quyết định xem một mail có phù hợp để học không. Script nên return một function Lua với một đối số duy nhất thuộc loại `rspamd_task`. The function nên return một boolean value (`true`: learn, `false`: skip learning), hoặc một pair chứa một boolean value và một numeric value ( để modify hash flag value, nếu necessary). Tham số `learn_conditions` được sử dụng để setup learn script. Cách thuận tiện nhất để đặt script là viết nó như một chuỗi nhiều dòng được support bởi `UCL`:
+```
+# Fuzzy check plugin configuration snippet
+learn_condition = <<EOD
+return function(task)
+  return true -- Always learn
+end
+EOD;
+```
+- Đây là một số ví dụ thực tế của useful script. Ví dụ, nếu chúng ta mong muốn hạn chế learning với các message đến từ một số domain nhất định:
+```
+return function(task)
+  local skip_domains = {
+    'example.com',
+    'google.com',
+  }
+
+  local from = task:get_from()
+
+  if from and from[1] and from[1]['addr'] then
+    for i,d in ipairs(skip_domains) do
+      if string.find(from[1]['addr'], d) then
+        return false
+      end
+    end
+  end
+
+
+end
+```
+- Nó có thể cũng được sử dụng để chia hash thành các flags khác nhau dựa trên source của họ. Ví dụ, như sources có thể encode trong `X-Source` title. Chẳng hạn, chúng ta có sự match giữa flags và sources:
+  - `honeypot`: `black` list: 1
+  - `users_unfiltered` - `gray` list: 2
+  - `user_filtered` - `black` list: 1
+  - `FP` - `while` list: 3
+- Script cung cấp logic này có thể như dưới đây:
+```
+return function(task)
+  local skip_headers = {
+    ['X-Source'] = function(hdr)
+      local sources = {
+        honeypot = 1,
+        users_unfiltered = 2,
+        users_filtered = 1,
+        FP = 3
+      }
+      local fl = sources[hdr]
+
+      if fl then return true,fl end -- Return true + new flag
+      return false
+    end
+  }
+
+  for h,f in pairs(skip_headers) do
+    local hdr = task:get_header(h) -- Check for interesting header
+    if h then
+      return f(hdr) -- Call its handler and return result
+    end
+  end
+
+  return false -- Do not learn if specified header is missing
+end
+```
+## Hashes replication
+- Người ta thường mong muốn có một local copy của remote storage. Rspamd supports replication cho mục đích này được triển khai trong hash storage từ version 1.3:
+![image](https://github.com/DinhHa1011/Rspamd/assets/119484840/708ebfdf-f8cd-40a5-92db-8a0eac0caddb)
+- The hashes transfer được khởi xướng bởi replication master. Nó gửi hash update commands, như adding, modifying hoặc deleting, tới tất cả specified slaves. Do đí slaves phải có thể chấp nhận connect từ master. Điều này cần đực tính đến khi config firewall
+- Theo mặc định slave listens port 11335 trên TCP để accept connections. Đồng bộ hóa giữa master và slave được perform qua HTTP protocol với HTTPCrypt transport encryption. Để cập nhật lặp đi lặp lại hoặc thao tác k hợp lệ, slave check update version. Nếu version của master nhỏ hơn hoặc bằng local version, update bị reject. Nếu master đi trước slave bởi nhiều hơn 1 version, message sau sẽ thông báo dưới log của slave:
+```
+rspamd_fuzzy_mirror_process_update: remote revision: XX is newer more than 1 revision than ours: YY, cold sync is recommended
+```
+- Trong trường hợp này chúng tôi recommand tạo lại database thông qua `cold` synchronization
+## The cold synchronization
+- Procedure này được sử dụng để khởi tạo một slave mới hoặc recover một slave sau khi liên lạc với master bị gián đoạn
+- Để sync master host bạn cần stop rspamd service và tạo một dump của hash database. Về lý thuyết, bạn có thể skip step này, tuy nhiên, nếu một version của master tạo bởi nhiều hơn một trong database cloning, nó sẽ được yêu cầu lặp lại thủ tục:
+```
+sqlite3 /var/lib/rspamd/fuzzy.db ".backup fuzzy.sql"
+```
+- Sau đó, copy output file `fuzzy.sql` cho tất cả slaves (nó có thể thực hiện mà không cần stop dịch vụ rspamd trên slaves):
+```
+sqlite3 /var/lib/rspamd/fuzzy.db ".restore fuzzy.sql"
+```
+- Sau tất cả, bạn có thể run rspamd trên slaves và sau đó switch trên master
+## Replication setup
+- Bạn có thể set replication trong file config hash storage, tên là `worker-fuzzy.inc`. Master replication được config như dưới đây:
+```
+# Fuzzy storage worker configuration snippet
+# Local keypair (rspamadm keypair -u)
+sync_keypair {
+    pubkey = "xxx";
+    privkey = "ppp";
+    encoding = "base32";
+    algorithm = "curve25519";
+    type = "kex";
+}
+# Remote slave
+slave {
+        name = "slave1";
+        hosts = "slave1.example.com";
+        key = "yyy";
+}
+slave {
+        name = "slave2";
+        hosts = "slave2.example.com";
+        key = "zzz";
+}
+```
+- Hãy tập trung vào việc config encryptions keys. Thông thường, rspamd tự động tạo một cặp khóa cho client và không yêu cầu một thiêt lập chuyên dụng nào. Tuy nhiên, trong replication case, master hoạt động như client, vì vậy bạn có thể set specific (public) key trên slaves cho better access control. Slave sẽ chỉ cho phép update đối với host đang sử dụng key này. Nó cũng khả thi để set cho phép IP-address của master, nhưng public key dựa trên protection có thể đáng tin cậy hơn. Ngoài ra, bạn có thể kết hợp phương thức này
+- Slave setup trông như:
+```
+# Fuzzy storage worker configuration snippet
+# We assume it is slave1 with pubkey 'yyy'
+sync_keypair {
+    pubkey = "yyy";
+    privkey = "PPP";
+    encoding = "base32";
+    algorithm = "curve25519";
+    type = "kex";
+}
+
+# Allow update from these hosts only
+masters = "master.example.com";
+# Also limit updates to this specific public key
+master_key = "xxx";
+```
+- Để tránh xung đột với local hashes, bạn có thể set một flag translation từ master tớ slave. Ví dụ, config sau có thể được sử dụng để dịch flag 1,2,3 thành 10,20,30
+```
+# Fuzzy storage worker configuration snippet
+master_flags {
+  "1" = 10;
+  "2" = 20;
+  "3" = 30;
+};
+```
+## Storage testing
+- Để test storage bạn có thể sử dụng command `rspamadm control fuzzystat`
+```
+Statistics for storage 73ee122ac2cfe0c4f12
+invalid_requests: 6.69M
+fuzzy_expired: 35.57k
+fuzzy_found: (v0.6: 0), (v0.8: 0), (v0.9: 0), (v1.0+: 20.10M)
+fuzzy_stored: 425.46k
+fuzzy_shingles: (v0.6: 0), (v0.8: 41.78k), (v0.9: 23.60M), (v1.0+: 380.87M)
+fuzzy_checked: (v0.6: 0), (v0.8: 95.29k), (v0.9: 55.47M), (v1.0+: 1.01G)
+
+Keys statistics:
+Key id: icy63itbhhni8
+        Checked: 1.00G
+        Matched: 18.29M
+        Errors: 0
+        Added: 1.81M
+        Deleted: 0
+
+        IPs stat:
+        x.x.x.x
+                Checked: 131.23M
+                Matched: 1.85M
+                Errors: 0
+                Added: 0
+                Deleted: 0
+
+        x.x.x.x
+                Checked: 119.86M
+                ...
+```
+- Về cơ bản, số liệu thống kê lưu trữ chung được trình diễn, như số của store và hash lỗi thời, và phân phối các yêu cầu cho client Protocol version:
+  - `v0.6` - requests from rspamd 0.6 - 0.8 (older versions, compatibility is limited)
+  - `v0.8` - requests from rspamd 0.8 - 0.9 (partially compatible)
+  - `v0.9` - unencrypted requests from rspamd 0.9+ (fully compatible)
+  - `v1.1` - encrypted requests from rspamd 1.1+ (fully compatible)
+- Sau đó số liệu thống kê được hiển thị cho mỗi config key trong storage và để biết địa chỉ IP của client. Trong phần kết luận, chúng ta thấy số liệu thống kê tổng thể về IP-addresses
+- 
