@@ -4,6 +4,7 @@
 - Để đạt được điều này, chúng ta cần replicate bayes và fuzzy storage backend data để remote host. 
 Ví chúng ta không muốn sao chép toàn bộ cache redis nên chúng ta nên sử dụng các phiên bản redis chuyên dụng. Nó sẽ là khôn ngoan nếu tách biệt bayes và fuzzy storage.
 - Chúng ta sẽ tạo 3 phiên bản Redis trên cả `master` và `replica`: `bayes`, `fuzzy`, `redis` cho cache còn lại
+  
 ![image](https://github.com/DinhHa1011/Rspamd/assets/119484840/79b73dbd-c2a5-41e1-b9e2-92ea5d5e85f6)
 ## Installation
 - Để bắt đầu, install `databases/redis` package bằng cách thực hiện command:
