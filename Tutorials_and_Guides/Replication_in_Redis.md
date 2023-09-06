@@ -70,3 +70,110 @@ dir /var/db/redis/bayes/
 
 maxmemory 600M
 ```
+```
+/usr/local/etc/redis-fuzzy.conf
+```
+```
+include /usr/local/etc/redis.conf
+
+port 6377
+
+pidfile /var/run/redis/fuzzy.pid
+logfile /var/log/redis/fuzzy.log
+dbfilename fuzzy.rdb
+dir /var/db/redis/fuzzy/
+```
+- Nếu cần, `maxmemory` sẽ được điều chỉnh cho các trường hợp cụ thể theo kích thước cơ sở dữ liệu dự kiến.
+## Starting Redis on the master
+```
+service redis start
+```
+## Setting up encrypted tunnel using stunnel
+- Setting up encrypted tunnel using tunnel có hướng dẫn ở link sau
+## Replica instances configuration
+```
+/usr/local/etc/redis-bayes.conf
+```
+```
+include /usr/local/etc/redis.conf
+
+port 6378
+
+pidfile /var/run/redis/bayes.pid
+logfile /var/log/redis/bayes.log
+dbfilename bayes.rdb
+dir /var/db/redis/bayes/
+
+replicaof localhost 6478
+
+maxmemory 600M
+```
+```
+/usr/local/etc/redis-fuzzy.conf
+```
+```
+include /usr/local/etc/redis.conf
+
+port 6377
+
+pidfile /var/run/redis/fuzzy.pid
+logfile /var/log/redis/fuzzy.log
+dbfilename fuzzy.rdb
+dir /var/db/redis/fuzzy/
+
+replicaof localhost 6477
+```
+- Vì `replicas` không kết nối trực tiếp tieespvowis `master`, socket của `stunnel` được chỉ định cụ thể trong `replicaof`
+## Starting Redis on the replica
+```
+service redis start
+```
+## Checking
+- Kiểm tra log phiên bản replica. Nếu tái đồng bộ hóa với master đã thành công, bạn đã hoàn thành
+## Rspamd configuration on the master
+- On the master side configure Rspamd to use distinct Redis instances respectively
+```
+local.d/redis.conf
+```
+```
+servers = "localhost";
+```
+```
+local.d/classifier-bayes.conf
+```
+```
+backend = "redis";
+servers = "localhost:6378";
+```
+```
+override.d/worker-fuzzy.inc
+```
+```
+backend = "redis";
+servers = "localhost:6377";
+```
+## Rspamd configuration on the replica
+- Trên `replica` side Rspamd nên sử dụng local `redis` instance cho cả reading và writing as it is not replicated
+```
+local.d/redis.conf
+```
+```
+servers = "localhost";
+```
+- Từ local `bayes` và `fuzzy` Redis instances are replicas, Rspamd nên sử dụng chúng để reading, nhưng write để replication `master`
+```
+local.d/classifier-bayes.conf
+```
+```
+backend = "redis";
+read_servers = "localhost:6378";
+write_servers = "localhost:6478";
+```
+```
+override.d/worker-fuzzy.inc
+```
+```
+backend = "redis";
+read_servers = "localhost:6377";
+write_servers = "localhost:6477";
+```
