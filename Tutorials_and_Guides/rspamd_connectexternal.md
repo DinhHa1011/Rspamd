@@ -1,5 +1,4 @@
 # Rspamd connect to  other server
-# Table of contents
 ## Rspamd Server
 
 - Config cổng 11334 (worker_controller) của Rspamd chạy public
