@@ -15,4 +15,9 @@
   - HFilter: chỉ URL-checks được applied
   - MX Check: is disabled
   - One Received header policy: is disabled
-  - 
+  - ratelimit: chỉ user ratelimit thì applied (để xác thực user - không xử lý với local_addrs)
+  - RBL: RBLs disabled theo `exclude_users` và `exclude_local` setting cho RBL rules ( ví dụ, URL list nên check cho tất cả directions)
+  - Replies: action thì không bị ép
+  - SPF: disabled
+- Ngoài ra, nó thì khả thi để disable/enable check có chọn lọc và/hoặc kiểm tra lại score cho user xác thực của bạn hoặc relay Ips sử dụng setting module
+
