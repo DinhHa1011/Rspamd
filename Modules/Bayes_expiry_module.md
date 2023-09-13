@@ -50,4 +50,5 @@ expire = 8640000;
 - Khi một giá trị `expire` được đặt thành giá trị thấp hơn giá trị hiện tại, TTLs vượt giá giá trị `expire` mới sẽ update trong expiration cycle tiếp theo
 - Để tăng giá trị `expire`, trước tiên cần thiết làm token kiên trì bởi setting `expire = -1`, va đợi đến tận khi ít nhất một expiration cycle được hoàn thành. Chỉ khi đó giá trị `expire` mới mới có thể cài đặt
 ## Limiting memory usage to a fixed amount
-- 
+- Memory usage của statistics dataset có thể được quản lý bằng cách sử dụng Redis `maxmemory` directive và `volatile-ttl` eviction policy. Nếu memory usage vượt quá `maxmemory` limit, Redis sẽ loại bỏ các khóa có TTLs tùy theo policy
+-  
