@@ -37,3 +37,15 @@ expire = 8640000;
 - Nhược điểm:
   - Statistic phải không được lưu trữ offile lâu hơn thời gian `expire`. `Bayes Expiry` module phải cập nhật định kỳ TTLs của họ, điều này có nghĩa là cần phải có các thủ tục sao lưu đặc biệt. chỉ cần sao chép tệp *.rdb sẽ khiến tệp hết hạn sau khi hết thời gian.
   - Nếu không có chính sách eviction nào được đặt trong redis nhắm mục tiêu đến significant tokens thì việc cập nhật liên tục các TTLs của chúng là không cần thiết.
+### Lazy expiration mode (1.7.4+)
+- `lazy` mode là expiration mode duy nhất từ Rspamd 2.0
+- Mode này đảm bảo rằng `significant` token có TTL được giữ liên tục (module cài đặt significant token TTLs thành -1, tức là làm cho họ kiên trì nếu họ không) trong khi TTL của `insignificant` hoặc `infrequent` token giảm giá trị `expire` nếu TTL hiện tại của nó vượt quá `expire`. `Common` token được phân biệt bằng cách setting lại TTL của họ xuống giá trị thấp hơn là 10 ngày nếu TTL của họ vượt quá ngưỡng này
+- Lợi ích của `lazy` mode bao gồm:
+  - Khả năng giữ statistic offile cho thời gian vô hạn mà không có nguy cơ mất `significant` token
+  - Giảm thiểu các update TTL không cần thiết càng nhiều càng tốt
+- Để active lazy expiration mode trong Rspamd version prior 2.0, simply add `lazy = true`, đến classifier config
+### Changing expiration mode (before 2.0)
+- expiration mode cho một existing statistics database có thể thay đổi trong config tại any moment. TTLs của token sẽ update theo yêu cầu trong chu kỳ expiration tiếp theo.
+### Changing expire value
+- Khi một giá trị `expire` được đặt thành giá trị thấp hơn giá trị hiện tại, TTLs vượt giá giá trị `expire` mới sẽ update trong expiration cycle tiếp theo
+- Để tăng giá trị `expire`, trước tiên cần thiết làm token kiên trì bởi setting `expire = -1`, va đợi đến tận khi ít nhất một expiration cycle được hoàn thành. Chỉ khi đó giá trị `expire` mới mới có thể cài đặt
