@@ -1,0 +1,1 @@
+- Mục đích của MID module là ngăn chặn INVALID_MSGID (malformed Message-ID header) và `MISSING_MID` (missing Message-ID) rules cho message được ký DKIM bởi một số domain cụ thể
