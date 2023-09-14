@@ -6,4 +6,5 @@
 - Mỗi rule trong config được xác định:
   - Một `selector` function xác định các message mà chúng tôi muốn export metadata from (default selector selects all message)
   - Một `formatter` function extracts formatted metadata from the message (default formatter returns full message content)
-  - Một  
+  - Một `pusher` function (xác định bởi `backend` setting) pushes metadata được định dạng ở đâu đó
+- Một số functions như vậy được xác định trong plugin có thể được sử dụng ngoài các function do người dùng xác định
