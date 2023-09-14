@@ -1,0 +1,1 @@
+- `milter headers` module (trước đây được biết đến như `rmilter headers`) đã được add trong Rspamd 1.5 
