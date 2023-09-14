@@ -1,0 +1,4 @@
+- Multimap module được thiết kế đặc biệt để xử lý rule dựa trên nhiều loại danh sách khác nhau được Rspamd cập nhật và được gọi là `map`.
+- Module này đặc biệt hữu ích cho tổ chức whitelists, blacklist, và lists khác thông qua files
+- Ngoài ra, nó có khả năng load remote list sử dụng HTTP và HTTPS protocol hoặc RESP (REdis Serialization Protocol)
+- 
