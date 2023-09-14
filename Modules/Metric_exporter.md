@@ -1,0 +1,4 @@
+- Metric exporter thu thập statistic từ Rspamd và cung cấp chúng cho hệ thống monitoring/graphing.
+- Graphite là chương trình phụ trợ được hỗ trợ duy nhất hiện nay
+- Ngoài ra, nếu bạn muốn sử dụng `pull` model để thu thập statistic từ Rspamd, chúng tôi cung cấp hỗ trợ cho Prometheus endpoint
+- Xem Controller worker và Controller HTTP endpoints để biết thêm thông tin
