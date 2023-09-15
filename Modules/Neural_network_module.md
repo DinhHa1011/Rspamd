@@ -1,0 +1,4 @@
+- Neural network module là một module thử nghiệm mà cho phép thực hiện phân loại sau các message dựa trên các ký hiệu hiện tại của chúng và một số kho dữ liệu training thu được từ lần học trước
+- Để sử dụng module này trong version trước tới Rspamd 2.0, từ Rspamd 1.7 up lên version 2.0, bạn phải build Rspamd với `libfann` support
+- Mặc dù nó thường được enable khi sử dụng pre-built packages, bạn phải chỉ định nó suer dụng `-DENABLE_FANN=ON` với `cmake` command trong quá trình build
+- Từ Rspamd 2.0, `libfann` module đã được thay thế bằng `kan` để cung cấp khả năng xử lý neural network tốt hơn, làm cho nó trở thành option ưa thích cho tất cả các cài đặt mới
