@@ -1,0 +1,2 @@
+- MX check module nghiên cứu domain trong địa chỉ SMTP FROM của message ( hoặc doamin trong HELO nếu SMTP FROM trống) có ít nhất một MX có thể kết nối được hay không. Nếu phát hiện thấy MX có thể kết nối, dữ liệu này sẽ được lưu trữ trong Redis
+- Để kích hoạt module này, sửa `enabled = true` trong `/etc/rspamd/local.d/mx_check.conf` và config redis cho toàn bộ hệ thống hoặc cho module cụ thể này
